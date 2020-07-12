@@ -2,79 +2,125 @@
 
 ## 1. 主机环境
 
-|      IP       | Hostname |    OS    | USER  |
-| :-----------: | :------: | :------: | :---: |
-| 192.168.7.130 | s-7-130  | CentOS 7 | root  |
-| 192.168.7.131 | s-7-131  | CentOS 7 | root  |
-| 192.168.7.132 | s-7-132  | CentOS 7 | root  |
+|      IP       |  Hostname   |    OS    | USER  |
+| :-----------: | :---------: | :------: | :---: |
+| 192.168.7.130 |   s-7-130   | CentOS 7 | root  |
+| 192.168.7.131 |   s-7-131   | CentOS 7 | root  |
+| 192.168.7.132 |   s-7-132   | CentOS 7 | root  |
+| 192.168.7.133 | k8s-s-7-133 | CentOS 7 | root  |
+| 192.168.7.134 | k8s-s-7-134 | CentOS 7 | root  |
+| 192.168.7.135 | k8s-s-7-135 | CentOS 7 | root  |
+| 192.168.7.136 | k8s-s-7-136 | CentOS 7 | root  |
+| 192.168.7.137 | k8s-s-7-137 | CentOS 7 | root  |
+| 192.168.7.138 | k8s-s-7-138 | CentOS 7 | root  |
+| 192.168.7.139 | k8s-s-7-139 | CentOS 7 | root  |
+| 192.168.7.140 | k8s-s-7-140 | CentOS 7 | root  |
+| 192.168.7.146 | k8s-s-7-146 | CentOS 7 | root  |
+| 192.168.7.147 | k8s-s-7-147 | CentOS 7 | root  |
 
 ## 2. 环境准备
 
-### 修改 hostname
+### IP填充
 
 ```bash
-# 192.168.7.130
-hostnamectl set-hostname s-7-130
+mkdir -p /tmp/kube
 
-# 192.168.7.131
-hostnamectl set-hostname s-7-131
+cd /tmp/kube
 
-# 192.168.7.132
-hostnamectl set-hostname s-7-132
+echo '192.168.7.133' > ip-k8s-s-7-133
+echo '192.168.7.134' > ip-k8s-s-7-134
+echo '192.168.7.135' > ip-k8s-s-7-135
+echo '192.168.7.136' > ip-k8s-s-7-136
+echo '192.168.7.137' > ip-k8s-s-7-137
+echo '192.168.7.138' > ip-k8s-s-7-138
+echo '192.168.7.139' > ip-k8s-s-7-139
+echo '192.168.7.140' > ip-k8s-s-7-140
+echo '192.168.7.146' > ip-k8s-s-7-146
+echo '192.168.7.147' > ip-k8s-s-7-147
 ```
 
-### 配置 Host
+### 修改 hostname & 配置 Host
 
-```host
-192.168.7.130 s-7-130
-192.168.7.131 s-7-131
-192.168.7.132 s-7-132
+```bash
+cd /tmp/kube
+
+for IP_FILE in `ls ip-k8s-*`; do
+  ssh root@`cat $IP_FILE` " cp /etc/hosts /etc/hosts_\`date +%Y%m%d%H%M\` "
+  ssh root@`cat $IP_FILE` " echo '192.168.7.130 s-7-130' >> /etc/hosts "
+  ssh root@`cat $IP_FILE` " echo '192.168.7.131 s-7-131' >> /etc/hosts "
+  ssh root@`cat $IP_FILE` " echo '192.168.7.132 s-7-132' >> /etc/hosts "
+  for IP_NODE in `ls ip-k8s-*`; do
+    ssh root@`cat $IP_FILE` " echo '`cat $IP_NODE` ${IP_NODE:3}' >> /etc/hosts "
+  done
+  ssh root@`cat $IP_FILE` " hostnamectl set-hostname ${IP_FILE:3} "
+done
 ```
 
 ### 添加阿里源
 
 ```bash
-# rm -rfv /etc/yum.repos.d/*
-mv /etc/yum.repos.d/CentOS-Base.repo /etc/yum.repos.d/CentOS-Base.repo.orign
-curl -o /etc/yum.repos.d/CentOS-Base.repo http://mirrors.aliyun.com/repo/Centos-7.repo
+cd /tmp/kube
 
-# 恢复原始源
-# rm -rf /etc/yum.repos.d.orign
-# mv /etc/yum.repos.d.orign /etc/yum.repos.d
-
-yum clean metadata
-yum makecache -y
-yum update -y
+for IP_FILE in `ls ip-k8s-*`; do
+  ssh root@`cat $IP_FILE` " mv /etc/yum.repos.d/CentOS-Base.repo /etc/yum.repos.d/CentOS-Base.repo.orign
+  curl -o /etc/yum.repos.d/CentOS-Base.repo http://mirrors.aliyun.com/repo/Centos-7.repo
+  yum clean metadata
+  yum makecache -y
+  yum update -y
+   "
+done
 ```
 
 ### 常用包
 
 ```bash
-yum -y install vim bash-completion net-tools gcc wget
+cd /tmp/kube
+
+for IP_FILE in `ls ip-k8s-*`; do
+  ssh root@`cat $IP_FILE` " yum -y install vim bash-completion net-tools gcc wget "
+done
 ```
 
 ### 关闭 SELinux
 
 ```bash
-setenforce 0
-cp /etc/selinux/config /etc/selinux/config.origin
-sed -i 's@SELINUX=enforcing@SELINUX=disabled@g' /etc/selinux/config
+cd /tmp/kube
+
+for IP_FILE in `ls ip-k8s-*`; do
+  ssh root@`cat $IP_FILE` "
+  setenforce 0
+  cp /etc/selinux/config /etc/selinux/config.origin
+  sed -i 's@SELINUX=enforcing@SELINUX=disabled@g' /etc/selinux/config
+   "
+done
 ```
 
 ### 关闭 firewalld
 
 ```bash
-systemctl stop firewalld
-systemctl disable firewalld
+cd /tmp/kube
+
+for IP_FILE in `ls ip-k8s-*`; do
+  ssh root@`cat $IP_FILE` "
+  systemctl stop firewalld
+  systemctl disable firewalld
+   "
+done
 ```
 
 ### 禁用 swap，注释 swap 分区
 
 ```bash
-swapoff -a
-sysctl -w vm.swappiness=0
-cp /etc/fstab /etc/fstab.origin
-sed -i '/swap/s/^/#/' /etc/fstab
+cd /tmp/kube
+
+for IP_FILE in `ls ip-k8s-*`; do
+  ssh root@`cat $IP_FILE` "
+  swapoff -a
+  sysctl -w vm.swappiness=0
+  cp /etc/fstab /etc/fstab.origin
+  sed -i '/swap/s/^/#/' /etc/fstab
+   "
+done
 ```
 
 ### 开启 ip_forward
@@ -82,6 +128,10 @@ sed -i '/swap/s/^/#/' /etc/fstab
 配置内核参数，将桥接的 IPv4 流量传递到 iptables 的链
 
 ```bash
+cd /tmp/kube
+
+for IP_FILE in `ls ip-k8s-*`; do
+  ssh root@`cat $IP_FILE` "
 modprobe br_netfilter
 cat <<EOF > /etc/sysctl.d/k8s.conf
 net.ipv4.ip_forward = 1
@@ -92,12 +142,20 @@ EOF
 sysctl -p /etc/sysctl.d/k8s.conf
 
 ls /proc/sys/net/bridge
+   "
+done
 ```
 
 ### 重启电脑
 
 ```bash
+cd /tmp/kube
+
+for IP_FILE in `ls ip-k8s-*`; do
+  ssh root@`cat $IP_FILE` "
 reboot
+   "
+done
 ```
 
 ## 3. 安装 Docker
@@ -107,10 +165,16 @@ reboot
 使用 aliyun 源安装 docker-ce
 
 ```bash
+cd /tmp/kube
+
+for IP_FILE in `ls ip-k8s-*`; do
+  ssh root@`cat $IP_FILE` "
 yum install -y yum-utils device-mapper-persistent-data lvm2
 yum-config-manager --add-repo http://mirrors.aliyun.com/docker-ce/linux/centos/docker-ce.repo
 yum makecache fast
 yum -y install docker-ce
+   "
+done
 ```
 
 ### 配置镜像加速
@@ -119,21 +183,34 @@ yum -y install docker-ce
 # 阿里云 https://fl791z1h.mirror.aliyuncs.com
 # 163 http://hub-mirror.c.163.com
 # 中科大 https://docker.mirrors.ustc.edu.cn/
+cd /tmp/kube
+
+for IP_FILE in `ls ip-k8s-*`; do
+  ssh root@`cat $IP_FILE` "
 mkdir /etc/docker
 touch /etc/docker/daemon.json
 cat <<EOF > /etc/docker/daemon.json
 {
-  "registry-mirrors": ["https://fl791z1h.mirror.aliyuncs.com"]
+  \"registry-mirrors\": [\"https://fl791z1h.mirror.aliyuncs.com\"]
 }
 EOF
 systemctl daemon-reload
+   "
+done
 ```
 
 ### 启动 Docker
 
 ```bash
+cd /tmp/kube
+
+for IP_FILE in `ls ip-k8s-*`; do
+  ssh root@`cat $IP_FILE` "
 systemctl start docker
 systemctl enable docker
+systemctl status docker
+   "
+done
 ```
 
 ## 4. 安装 K8s
@@ -141,6 +218,10 @@ systemctl enable docker
 ### 添加阿里 kubernetes 源
 
 ```bash
+cd /tmp/kube
+
+for IP_FILE in `ls ip-k8s-*`; do
+  ssh root@`cat $IP_FILE` "
 cat <<EOF > /etc/yum.repos.d/kubernetes.repo
 [kubernetes]
 name=Kubernetes
@@ -150,21 +231,46 @@ gpgcheck=1
 repo_gpgcheck=1
 gpgkey=https://mirrors.aliyun.com/kubernetes/yum/doc/yum-key.gpg https://mirrors.aliyun.com/kubernetes/yum/doc/rpm-package-key.gpg
 EOF
+   "
+done
 ```
 
 ### 安装 k8s
 
 ```bash
-yum install -y kubectl kubelet kubeadm
+cd /tmp/kube
 
+for IP_FILE in `ls ip-k8s-*`; do
+  ssh root@`cat $IP_FILE` "
+yum install -y kubectl kubelet kubeadm
+   "
+done
+```
+
+启动 k8s
+
+```bash
+cd /tmp/kube
+
+for IP_FILE in `ls ip-k8s-*`; do
+  ssh root@`cat $IP_FILE` "
 systemctl start kubelet
 systemctl enable kubelet
+systemctl status kubelet
+   "
+done
 ```
 
 ### 使 kubectl 可以自动补充
 
 ```bash
+cd /tmp/kube
+
+for IP_FILE in `ls ip-k8s-*`; do
+  ssh root@`cat $IP_FILE` "
 source <(kubectl completion bash)
+   "
+done
 ```
 
 ### kubeadmin 安装集群（仅限 master 节点）
@@ -254,8 +360,14 @@ kube-system            kube-scheduler-s-7-130                      1/1     Runni
 ### 执行 join（仅限 node 节点）
 
 ```bash
+cd /tmp/kube
+
+for IP_FILE in `ls ip-k8s-*`; do
+  ssh root@`cat $IP_FILE` "
 kubeadm join 192.168.7.130:6443 --token ajsz3p.dvsee4hc658p9253 \
     --discovery-token-ca-cert-hash sha256:39032fd0451b556eae8babd7ee732655dfe5739e700fdfb87921c8177dd6ae20
+   "
+done
 ```
 
 结果如下：
