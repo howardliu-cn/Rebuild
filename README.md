@@ -13,3 +13,5 @@
 - 数据库
   - MySQL
 - Spring
+
+![公众号：看山的小屋](http://static.howardliu.cn/about/kanshanshuo.png)
